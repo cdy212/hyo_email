@@ -76,11 +76,6 @@
         <!-- Left Column: Settings -->
         <div class="card">
             <h3>1. 기본 설정</h3>
-            
-            <div class="form-group">
-                <label>Github Token (저장소 Push용)</label>
-                <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
-            </div>
 
             <div class="form-group">
                 <label>파일명 (예: email_260601)</label>
@@ -144,11 +139,7 @@
     let finalHtml = "";
     const TARGET_WIDTH = 1000;
 
-    // Load Token from local storage
     document.addEventListener('DOMContentLoaded', () => {
-        const savedToken = localStorage.getItem('gh_token');
-        if (savedToken) document.getElementById('githubToken').value = savedToken;
-
         // Toggle required state of button image upload based on format
         document.querySelectorAll('input[name="format"]').forEach(radio => {
             radio.addEventListener('change', (e) => {
@@ -327,68 +318,41 @@
     }
 
     async function pushToGithub() {
-        const token = document.getElementById('githubToken').value.trim();
         const filename = document.getElementById('baseFilename').value.trim();
         
-        if (!token) return alert("Github Token을 입력해주세요.");
-        localStorage.setItem('gh_token', token); // Save token
+        if (!filename) return alert("파일명을 입력해주세요.");
 
-        showStatus("Github에 파일 업로드 중...", "loading");
+        showStatus("로컬 서버를 통해 Github 배포 중...", "loading");
         document.getElementById('btnPush').disabled = true;
 
         try {
-            // Upload Image (Base64 encoding without data header)
             const imgContent = finalBase64Image.split(',')[1];
-            await putToGithubApi(token, `${filename}.jpg`, imgContent);
-
-            // Upload HTML (Base64 encode UTF-8 string)
-            const htmlContent = btoa(unescape(encodeURIComponent(finalHtml)));
-            await putToGithubApi(token, `${filename}.html`, htmlContent);
-
-            showStatus("배포 성공! 잠시 후 URL에서 확인 가능합니다.", "success");
             
-            const resultLink = document.getElementById('resultLink');
-            resultLink.href = `https://hyo-email.pages.dev/${filename}.html`;
-            resultLink.style.display = 'block';
+            const res = await fetch('/api/push', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename: filename,
+                    html: finalHtml,
+                    image_base64: imgContent
+                })
+            });
 
+            const data = await res.json();
+
+            if (data.success) {
+                showStatus("배포 성공! 잠시 후 URL에서 확인 가능합니다.", "success");
+                const resultLink = document.getElementById('resultLink');
+                resultLink.href = `https://hyo-email.pages.dev/${filename}.html`;
+                resultLink.style.display = 'block';
+            } else {
+                throw new Error(data.error || "알 수 없는 오류");
+            }
         } catch (e) {
             console.error(e);
-            showStatus("배포 중 오류가 발생했습니다. Token 권한이나 콘솔을 확인하세요.", "error");
+            showStatus(`배포 중 오류가 발생했습니다: ${e.message}`, "error");
             document.getElementById('btnPush').disabled = false;
         }
-    }
-
-    async function putToGithubApi(token, path, base64Content) {
-        const owner = 'cdy212';
-        const repo = 'hyo_email';
-        const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
-        
-        // 1. Check if file already exists to get its SHA (required for updating)
-        let sha = null;
-        let getRes = await fetch(url, { headers: { 'Authorization': `token ${token}` } });
-        if (getRes.status === 200) {
-            let data = await getRes.json();
-            sha = data.sha;
-        }
-
-        // 2. Put file
-        let body = {
-            message: `Auto-deploy ${path} via Builder UI`,
-            content: base64Content,
-            branch: 'main'
-        };
-        if (sha) body.sha = sha;
-
-        let putRes = await fetch(url, {
-            method: 'PUT',
-            headers: {
-                'Authorization': `token ${token}`,
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(body)
-        });
-
-        if (!putRes.ok) throw new Error(`HTTP ${putRes.status} on uploading ${path}`);
     }
 </script>
 
