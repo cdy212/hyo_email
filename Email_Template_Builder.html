@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이메일 템플릿 자동 생성기</title>
+    <style>
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --bg: #F3F4F6;
+            --text: #1F2937;
+            --border: #D1D5DB;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        h1 { margin-top: 0; color: var(--primary); }
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        .card {
+            border: 1px solid var(--border);
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; }
+        input[type="text"], input[type="password"], input[type="url"] {
+            width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box;
+        }
+        .radio-group label { display: inline-block; font-weight: normal; margin-right: 15px; }
+        button {
+            background: var(--primary); color: white; border: none; padding: 10px 20px;
+            border-radius: 4px; cursor: pointer; font-size: 16px; width: 100%; margin-top: 10px;
+        }
+        button:hover { background: var(--primary-hover); }
+        button:disabled { background: #9CA3AF; cursor: not-allowed; }
+        .status {
+            padding: 10px; margin-top: 20px; border-radius: 4px; font-weight: bold; text-align: center;
+        }
+        .status.loading { background: #FEF3C7; color: #92400E; }
+        .status.success { background: #D1FAE5; color: #065F46; }
+        .status.error { background: #FEE2E2; color: #991B1B; }
+        textarea {
+            width: 100%; height: 200px; padding: 10px; border: 1px solid var(--border);
+            border-radius: 4px; box-sizing: border-box; font-family: monospace; resize: vertical;
+        }
+        canvas {
+            max-width: 100%; height: auto; border: 1px solid var(--border); margin-top: 10px;
+        }
+        img { display: none; } /* Hidden original images */
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🚀 이메일 템플릿 자동 생성기</h1>
+    <div id="statusBox" class="status loading">OpenCV.js 로딩 중... 잠시만 기다려주세요.</div>
+
+    <div class="grid" style="margin-top: 20px;">
+        <!-- Left Column: Settings -->
+        <div class="card">
+            <h3>1. 기본 설정</h3>
+            
+            <div class="form-group">
+                <label>Github Token (저장소 Push용)</label>
+                <input type="password" id="githubToken" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx">
+            </div>
+
+            <div class="form-group">
+                <label>파일명 (예: email_260601)</label>
+                <input type="text" id="baseFilename" placeholder="email_000000">
+            </div>
+
+            <div class="form-group">
+                <label>이동할 링크 URL</label>
+                <input type="url" id="targetUrl" placeholder="https://...">
+            </div>
+
+            <div class="form-group">
+                <label>레이아웃 포맷</label>
+                <div class="radio-group">
+                    <label><input type="radio" name="format" value="mobile" checked> 모바일 용도 (반응형, 전체클릭)</label>
+                    <label><input type="radio" name="format" value="email"> 이메일 용도 (1000px 고정, 부분클릭)</label>
+                </div>
+            </div>
+
+            <h3>2. 이미지 업로드</h3>
+            <div class="form-group">
+                <label>원본 전체 이미지 (.jpg/.png)</label>
+                <input type="file" id="mainImageInput" accept="image/*">
+            </div>
+            
+            <div class="form-group" id="btnUploadGroup">
+                <label>버튼 전용 이미지 (이메일 용도 선택시 필수)</label>
+                <input type="file" id="btnImageInput" accept="image/*">
+            </div>
+
+            <button id="btnGenerate" disabled onclick="generateTemplate()">HTML 생성 및 매칭하기</button>
+            <button id="btnPush" disabled style="background: #10B981;" onclick="pushToGithub()">Github 배포하기</button>
+            <a id="resultLink" href="#" target="_blank" style="display:none; text-align:center; display:block; margin-top:10px; font-weight:bold; color:#4F46E5;">🔗 최종 URL 열기</a>
+        </div>
+
+        <!-- Right Column: Preview & Output -->
+        <div class="card">
+            <h3>미리보기 및 결과 HTML</h3>
+            <label>생성된 HTML 소스</label>
+            <textarea id="htmlOutput" readonly></textarea>
+            
+            <label style="margin-top: 20px;">이미지 미리보기 (가로 1000px 리사이징)</label>
+            <!-- Preview Canvas -->
+            <canvas id="previewCanvas"></canvas>
+            
+            <!-- Hidden Canvas/Img for processing -->
+            <img id="imgMain">
+            <img id="imgBtn">
+            <canvas id="hiddenMainCanvas" style="display:none;"></canvas>
+            <canvas id="hiddenBtnCanvas" style="display:none;"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Load OpenCV.js asynchronously -->
+<script async src="https://docs.opencv.org/4.8.0/opencv.js" onload="onOpenCvReady();" type="text/javascript"></script>
+
+<script>
+    let cvReady = false;
+    let finalBase64Image = "";
+    let finalHtml = "";
+    const TARGET_WIDTH = 1000;
+
+    // Load Token from local storage
+    document.addEventListener('DOMContentLoaded', () => {
+        const savedToken = localStorage.getItem('gh_token');
+        if (savedToken) document.getElementById('githubToken').value = savedToken;
+
+        // Toggle required state of button image upload based on format
+        document.querySelectorAll('input[name="format"]').forEach(radio => {
+            radio.addEventListener('change', (e) => {
+                const isEmail = e.target.value === 'email';
+                document.getElementById('btnUploadGroup').style.opacity = isEmail ? '1' : '0.5';
+            });
+        });
+    });
+
+    function showStatus(msg, type) {
+        const box = document.getElementById('statusBox');
+        box.className = `status ${type}`;
+        box.innerText = msg;
+    }
+
+    function onOpenCvReady() {
+        cvReady = true;
+        document.getElementById('btnGenerate').disabled = false;
+        showStatus("OpenCV.js 로드 완료! 프로그램을 사용할 준비가 되었습니다.", "success");
+    }
+
+    // Handle File Inputs reading
+    function loadImage(fileInput, imgElement) {
+        return new Promise((resolve) => {
+            if (fileInput.files.length === 0) resolve(false);
+            const file = fileInput.files[0];
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                imgElement.onload = () => resolve(true);
+                imgElement.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    async function generateTemplate() {
+        const filename = document.getElementById('baseFilename').value.trim();
+        const url = document.getElementById('targetUrl').value.trim();
+        const format = document.querySelector('input[name="format"]:checked').value;
+        
+        if (!filename || !url) return alert("파일명과 링크 URL을 모두 입력해주세요.");
+        
+        showStatus("이미지 분석 및 HTML 생성 중...", "loading");
+
+        const hasMain = await loadImage(document.getElementById('mainImageInput'), document.getElementById('imgMain'));
+        if (!hasMain) return alert("원본 전체 이미지를 업로드해주세요.");
+
+        const imgMain = document.getElementById('imgMain');
+        const imgBtn = document.getElementById('imgBtn');
+        
+        // 1. Calculate original dimensions and 1000px scale
+        const origW = imgMain.width;
+        const origH = imgMain.height;
+        const scale = TARGET_WIDTH / origW;
+        const targetH = Math.round(origH * scale);
+
+        // 2. Draw resized main image for base64 extraction & preview
+        const pCanvas = document.getElementById('previewCanvas');
+        pCanvas.width = TARGET_WIDTH;
+        pCanvas.height = targetH;
+        const pCtx = pCanvas.getContext('2d');
+        pCtx.drawImage(imgMain, 0, 0, TARGET_WIDTH, targetH);
+        
+        finalBase64Image = pCanvas.toDataURL('image/jpeg', 0.9);
+        
+        let coordsString = "";
+
+        // 3. OpenCV Template Matching (If Email format is chosen)
+        if (format === 'email') {
+            const hasBtn = await loadImage(document.getElementById('btnImageInput'), document.getElementById('imgBtn'));
+            if (!hasBtn) {
+                showStatus("에러: 이메일 용도는 버튼 이미지가 필수입니다.", "error");
+                return;
+            }
+
+            // Draw original images to hidden canvas for OpenCV processing
+            const hMainC = document.getElementById('hiddenMainCanvas');
+            hMainC.width = origW; hMainC.height = origH;
+            hMainC.getContext('2d').drawImage(imgMain, 0, 0);
+
+            const hBtnC = document.getElementById('hiddenBtnCanvas');
+            hBtnC.width = imgBtn.width; hBtnC.height = imgBtn.height;
+            hBtnC.getContext('2d').drawImage(imgBtn, 0, 0);
+
+            try {
+                let src = cv.imread(hMainC);
+                let templ = cv.imread(hBtnC);
+                let dst = new cv.Mat();
+                let mask = new cv.Mat();
+                
+                // Match Template
+                cv.matchTemplate(src, templ, dst, cv.TM_CCOEFF_NORMED, mask);
+                let result = cv.minMaxLoc(dst, mask);
+                let maxPoint = result.maxLoc;
+
+                // Original coordinates
+                let ox = maxPoint.x;
+                let oy = maxPoint.y;
+                let ow = imgBtn.width;
+                let oh = imgBtn.height;
+
+                // Scaled coordinates for 1000px width
+                let sx1 = Math.round(ox * scale);
+                let sy1 = Math.round(oy * scale);
+                let sx2 = Math.round((ox + ow) * scale);
+                let sy2 = Math.round((oy + oh) * scale);
+
+                coordsString = `${sx1},${sy1},${sx2},${sy2}`;
+
+                // Draw Red Rectangle on preview
+                pCtx.strokeStyle = 'red';
+                pCtx.lineWidth = 3;
+                pCtx.strokeRect(sx1, sy1, sx2 - sx1, sy2 - sy1);
+
+                src.delete(); templ.delete(); dst.delete(); mask.delete();
+            } catch (e) {
+                console.error(e);
+                showStatus("이미지 분석 중 오류가 발생했습니다. 개발자 도구를 확인하세요.", "error");
+                return;
+            }
+        }
+
+        // 4. Generate HTML String
+        const imageFileName = `${filename}.jpg`;
+        if (format === 'mobile') {
+            finalHtml = `<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newsletter</title>
+</head>
+<body marginwidth="0" marginheight="0" style="margin:0; padding:0; background-color:#ffffff;">
+    <table align="center" border="0" cellpadding="0" cellspacing="0" width="100%" style="max-width: 1000px; width: 100%; margin: 0 auto;">
+        <tr>
+            <td align="center" style="padding: 0;">
+                <a href="${url}" target="_blank" style="text-decoration: none;">
+                    <img src="${imageFileName}" width="1000" style="display: block; width: 100%; max-width: 1000px; height: auto; border: 0;" alt="Link">
+                </a>
+            </td>
+        </tr>
+        <tr>
+            <td align="left" style="padding: 10px; font-family: sans-serif; font-size: 14px; color: #666; word-break: keep-all;">
+                이미지가 클릭되지 않나요?
+                <a href="${url}" style="color: #d9534f; text-decoration: underline;">[바로가기]</a>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>`;
+        } else {
+            finalHtml = `<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <title>Newsletter</title>
+</head>
+<body marginwidth="0" marginheight="0" style="margin:0; padding:0; background-color:#ffffff;">
+    <div style="width: 1000px; text-align: left; margin: 0;">       
+        <img src="${imageFileName}" usemap="#image-map" style="border:0;">   
+        <map name="image-map">
+            <area target="_blank" alt="link" title="link" href="${url}" coords="${coordsString}" shape="rect">
+        </map>
+    </div>
+    <div style="width: 1000px; margin: 10px; text-align: left; font-family: sans-serif; font-size: 14px; color: #666;">
+        이미지가 클릭되지 않나요? 
+        <a href="${url}" style="color: #d9534f; text-decoration: underline;">[바로가기]</a>    
+    </div>
+</body>
+</html>`;
+        }
+
+        document.getElementById('htmlOutput').value = finalHtml;
+        document.getElementById('btnPush').disabled = false;
+        showStatus("HTML 생성 및 준비 완료! 이제 배포할 수 있습니다.", "success");
+    }
+
+    async function pushToGithub() {
+        const token = document.getElementById('githubToken').value.trim();
+        const filename = document.getElementById('baseFilename').value.trim();
+        
+        if (!token) return alert("Github Token을 입력해주세요.");
+        localStorage.setItem('gh_token', token); // Save token
+
+        showStatus("Github에 파일 업로드 중...", "loading");
+        document.getElementById('btnPush').disabled = true;
+
+        try {
+            // Upload Image (Base64 encoding without data header)
+            const imgContent = finalBase64Image.split(',')[1];
+            await putToGithubApi(token, `${filename}.jpg`, imgContent);
+
+            // Upload HTML (Base64 encode UTF-8 string)
+            const htmlContent = btoa(unescape(encodeURIComponent(finalHtml)));
+            await putToGithubApi(token, `${filename}.html`, htmlContent);
+
+            showStatus("배포 성공! 잠시 후 URL에서 확인 가능합니다.", "success");
+            
+            const resultLink = document.getElementById('resultLink');
+            resultLink.href = `https://hyo-email.pages.dev/${filename}.html`;
+            resultLink.style.display = 'block';
+
+        } catch (e) {
+            console.error(e);
+            showStatus("배포 중 오류가 발생했습니다. Token 권한이나 콘솔을 확인하세요.", "error");
+            document.getElementById('btnPush').disabled = false;
+        }
+    }
+
+    async function putToGithubApi(token, path, base64Content) {
+        const owner = 'cdy212';
+        const repo = 'hyo_email';
+        const url = `https://api.github.com/repos/${owner}/${repo}/contents/${path}`;
+        
+        // 1. Check if file already exists to get its SHA (required for updating)
+        let sha = null;
+        let getRes = await fetch(url, { headers: { 'Authorization': `token ${token}` } });
+        if (getRes.status === 200) {
+            let data = await getRes.json();
+            sha = data.sha;
+        }
+
+        // 2. Put file
+        let body = {
+            message: `Auto-deploy ${path} via Builder UI`,
+            content: base64Content,
+            branch: 'main'
+        };
+        if (sha) body.sha = sha;
+
+        let putRes = await fetch(url, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `token ${token}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(body)
+        });
+
+        if (!putRes.ok) throw new Error(`HTTP ${putRes.status} on uploading ${path}`);
+    }
+</script>
+
+</body>
+</html>
