@@ -366,8 +366,8 @@
             currentX = Math.round(e.clientX - rect.left);
             currentY = Math.round(e.clientY - rect.top);
             drawAll();
-            // 현재 드래그 중인 임시 사각형 그리기
-            ctx.strokeStyle = '#4F46E5';
+            // 현재 드래그 중인 임시 사각형 그리기 (붉은색 표시)
+            ctx.strokeStyle = '#EF4444';
             ctx.lineWidth = 2;
             ctx.setLineDash([4, 4]);
             ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
@@ -403,15 +403,16 @@
                     const w = x2 - x1;
                     const h = y2 - y1;
 
-                    ctx.fillStyle = 'rgba(79, 70, 229, 0.2)';
+                    // 마우스 선택 영역 붉은색 표시 (HTML 반영없이 확인용도)
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.25)';
                     ctx.fillRect(x1, y1, w, h);
 
-                    ctx.strokeStyle = '#4F46E5';
+                    ctx.strokeStyle = '#EF4444';
                     ctx.lineWidth = 2;
                     ctx.strokeRect(x1, y1, w, h);
 
-                    // 텍스트 라벨
-                    ctx.fillStyle = '#4F46E5';
+                    // 텍스트 라벨 (붉은색)
+                    ctx.fillStyle = '#DC2626';
                     ctx.font = 'bold 12px Inter, sans-serif';
                     ctx.fillText(`#${idx + 1}`, x1 + 6, y1 + 16);
                 }
@@ -506,7 +507,10 @@
                     alertEl.innerHTML = `
                         <b>🎉 배포 성공!</b><br>
                         ${result.message}<br>
-                        👉 <a href="${result.url}" target="_blank" style="color:#065F46; font-weight:bold;">${result.url}</a>
+                        <div style="margin-top:8px; display:flex; flex-direction:column; gap:6px;">
+                            <div>👉 <b>실시간 주소:</b> <a href="${result.url}" target="_blank" style="color:#065F46; font-weight:bold;">${result.url}</a></div>
+                            <div>💾 <b>다운로드:</b> <a href="${result.download_url}" target="_blank" style="display:inline-block; background:#059669; color:white; padding:6px 12px; border-radius:6px; text-decoration:none; font-weight:bold; font-size:12px; margin-top:4px;">최종 HTML 파일 내 컴퓨터로 다운로드</a></div>
+                        </div>
                     `;
                     alertEl.style.display = 'block';
                 } else {

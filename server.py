@@ -129,6 +129,7 @@ def save_map():
         return jsonify({
             "success": True,
             "url": f"https://hyo-email.pages.dev/{html_file}",
+            "download_url": f"/api/download/{html_file}",
             "message": f"{html_file} 좌표 설정 및 Cloudflare Pages 배포가 완료되었습니다!"
         })
 
@@ -136,6 +137,13 @@ def save_map():
         import traceback
         traceback.print_exc()
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/download/<filename>')
+def download_file(filename):
+    file_path = os.path.join(BASE_DIR, filename)
+    if os.path.exists(file_path):
+        return send_file(file_path, as_attachment=True)
+    return "File not found", 404
 
 @app.route('/<filename>')
 def serve_static(filename):
