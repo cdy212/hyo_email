@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>이메일 템플릿 마우스 좌표 픽커 & 배포 (Email Map Picker)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&family=Noto+Sans+KR:wght@400;500;700&display=swap');
+        :root {
+            --primary: #4F46E5;
+            --primary-hover: #4338CA;
+            --success: #10B981;
+            --success-hover: #059669;
+            --danger: #EF4444;
+            --bg: #F8FAFC;
+            --card-bg: #FFFFFF;
+            --text: #1E293B;
+            --text-muted: #64748B;
+            --border: #E2E8F0;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Inter', 'Noto Sans KR', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 24px;
+        }
+        .header {
+            max-width: 1300px;
+            margin: 0 auto 24px auto;
+            background: var(--card-bg);
+            padding: 24px 32px;
+            border-radius: 16px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+            border: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+        .header h1 {
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0;
+            color: var(--primary);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header p {
+            margin: 4px 0 0 0;
+            color: var(--text-muted);
+            font-size: 14px;
+        }
+        .controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .select-group {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .select-group label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+        select, input[type="text"] {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: #F8FAFC;
+            color: var(--text);
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        select:focus, input[type="text"]:focus {
+            border-color: var(--primary);
+        }
+        .main-layout {
+            max-width: 1300px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1000px 1fr;
+            gap: 24px;
+            align-items: start;
+        }
+        .canvas-container {
+            background: var(--card-bg);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+            padding: 16px;
+            position: relative;
+            width: 1034px; /* 1000px + padding */
+            overflow: auto;
+        }
+        .canvas-wrapper {
+            position: relative;
+            width: 1000px;
+            margin: 0 auto;
+            cursor: crosshair;
+            user-select: none;
+        }
+        #bg-image {
+            display: block;
+            width: 1000px;
+            height: auto;
+            border-radius: 8px;
+        }
+        #overlay-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 1000px;
+            height: 100%;
+            pointer-events: auto;
+        }
+        .sidebar {
+            background: var(--card-bg);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .sidebar h2 {
+            font-size: 18px;
+            margin: 0;
+            font-weight: 700;
+            color: var(--text);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .badge {
+            background: #EEF2FF;
+            color: var(--primary);
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+        }
+        .area-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .area-item {
+            background: #F8FAFC;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            position: relative;
+        }
+        .area-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--primary);
+        }
+        .area-coords {
+            font-family: monospace;
+            font-size: 12px;
+            background: #EEF2FF;
+            padding: 4px 8px;
+            border-radius: 6px;
+            color: var(--primary);
+        }
+        .btn-delete {
+            background: none;
+            border: none;
+            color: var(--danger);
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+        .btn-delete:hover {
+            background: #FEE2E2;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(79, 70, 229, 0.2);
+        }
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+        .btn-success {
+            background: var(--success);
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.2);
+        }
+        .btn-success:hover {
+            background: var(--success-hover);
+            transform: translateY(-1px);
+        }
+        .alert {
+            padding: 12px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            display: none;
+        }
+        .alert-success {
+            background: #D1FAE5;
+            color: #065F46;
+            border: 1px solid #A7F3D0;
+        }
+        .alert-error {
+            background: #FEE2E2;
+            color: #991B1B;
+            border: 1px solid #FECACA;
+        }
+        .helper-text {
+            font-size: 13px;
+            color: var(--text-muted);
+            line-height: 1.5;
+            background: #F1F5F9;
+            padding: 12px;
+            border-radius: 8px;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div>
+            <h1>🖱️ 이메일 템플릿 마우스 좌표 픽커 & 배포</h1>
+            <p>메인 이미지 위에서 <b>마우스 드래그</b>로 버튼 클릭 영역을 설정하고 <b>클라우드(Pages)</b>로 즉시 배포하세요.</p>
+        </div>
+        <div class="controls">
+            <div class="select-group">
+                <label for="html-select">📄 대상 HTML 파일</label>
+                <select id="html-select"></select>
+            </div>
+            <div class="select-group">
+                <label for="img-select">🖼️ 메인 시안 이미지 (1000px)</label>
+                <select id="img-select"></select>
+            </div>
+        </div>
+    </div>
+
+    <div class="main-layout">
+        <div class="canvas-container">
+            <div class="canvas-wrapper" id="canvas-wrapper">
+                <img id="bg-image" src="email_260519_baby_main.png" alt="이메일 메인 시안">
+                <canvas id="overlay-canvas"></canvas>
+            </div>
+        </div>
+
+        <div class="sidebar">
+            <h2>
+                <span>🎯 지정된 클릭 영역 목록</span>
+                <span class="badge" id="area-count">0</span>
+            </h2>
+
+            <div class="helper-text">
+                💡 <b>사용법:</b> 왼쪽 이미지 위에서 <b>마우스를 클릭한 채 드래그</b>하여 좌표 박스를 생성하세요.<br>
+                생성된 영역의 링크 주소와 이름을 수정한 뒤, 아래 배포 버튼을 누르면 <b>Git Push 및 Cloudflare Pages 배포</b>가 자동으로 완료됩니다.
+            </div>
+
+            <div class="area-list" id="area-list">
+                <!-- 드래그로 생성된 영역 아이템들이 표시됩니다 -->
+            </div>
+
+            <div id="status-alert" class="alert"></div>
+
+            <button class="btn-success" id="btn-save-deploy">
+                🚀 좌표 적용 및 Cloudflare Pages 즉시 배포
+            </button>
+        </div>
+    </div>
+
+    <script>
+        let areas = [];
+        let isDrawing = false;
+        let startX = 0;
+        let startY = 0;
+        let currentX = 0;
+        let currentY = 0;
+
+        const img = document.getElementById('bg-image');
+        const canvas = document.getElementById('overlay-canvas');
+        const ctx = canvas.getContext('2d');
+        const wrapper = document.getElementById('canvas-wrapper');
+        const areaListEl = document.getElementById('area-list');
+        const areaCountEl = document.getElementById('area-count');
+        const alertEl = document.getElementById('status-alert');
+
+        // 파일 목록 불러오기
+        async function loadFiles() {
+            try {
+                const res = await fetch('/api/files');
+                const data = await res.json();
+                const htmlSelect = document.getElementById('html-select');
+                const imgSelect = document.getElementById('img-select');
+
+                htmlSelect.innerHTML = data.html_files.map(f => `<option value="${f}" ${f === 'email_260519_baby.html' ? 'selected' : ''}>${f}</option>`).join('');
+                imgSelect.innerHTML = data.images.map(f => `<option value="${f}" ${f === 'email_260519_baby_main.png' ? 'selected' : ''}>${f}</option>`).join('');
+
+                imgSelect.addEventListener('change', () => {
+                    img.src = imgSelect.value;
+                });
+            } catch (err) {
+                console.error("파일 목록 로드 오류:", err);
+            }
+        }
+
+        img.onload = () => {
+            canvas.width = img.clientWidth || 1000;
+            canvas.height = img.clientHeight;
+            drawAll();
+        };
+
+        // 캔버스 드래그 이벤트
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            startX = Math.round(e.clientX - rect.left);
+            startY = Math.round(e.clientY - rect.top);
+            isDrawing = true;
+        });
+
+        canvas.addEventListener('mousemove', (e) => {
+            if (!isDrawing) return;
+            const rect = canvas.getBoundingClientRect();
+            currentX = Math.round(e.clientX - rect.left);
+            currentY = Math.round(e.clientY - rect.top);
+            drawAll();
+            // 현재 드래그 중인 임시 사각형 그리기
+            ctx.strokeStyle = '#4F46E5';
+            ctx.lineWidth = 2;
+            ctx.setLineDash([4, 4]);
+            ctx.strokeRect(startX, startY, currentX - startX, currentY - startY);
+            ctx.setLineDash([]);
+        });
+
+        canvas.addEventListener('mouseup', (e) => {
+            if (!isDrawing) return;
+            isDrawing = false;
+            const x1 = Math.min(startX, currentX);
+            const y1 = Math.min(startY, currentY);
+            const x2 = Math.max(startX, currentX);
+            const y2 = Math.max(startY, currentY);
+
+            if (x2 - x1 > 15 && y2 - y1 > 15) {
+                areas.push({
+                    coords: `${x1},${y1},${x2},${y2}`,
+                    href: 'https://www.neonatology.or.kr/conference/seminar2/info.html',
+                    alt: '사전등록 바로가기',
+                    title: '사전등록 바로가기'
+                });
+                renderAreaList();
+            }
+            drawAll();
+        });
+
+        function drawAll() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            areas.forEach((area, idx) => {
+                const parts = area.coords.split(',').map(Number);
+                if (parts.length === 4) {
+                    const [x1, y1, x2, y2] = parts;
+                    const w = x2 - x1;
+                    const h = y2 - y1;
+
+                    ctx.fillStyle = 'rgba(79, 70, 229, 0.2)';
+                    ctx.fillRect(x1, y1, w, h);
+
+                    ctx.strokeStyle = '#4F46E5';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x1, y1, w, h);
+
+                    // 텍스트 라벨
+                    ctx.fillStyle = '#4F46E5';
+                    ctx.font = 'bold 12px Inter, sans-serif';
+                    ctx.fillText(`#${idx + 1}`, x1 + 6, y1 + 16);
+                }
+            });
+        }
+
+        function renderAreaList() {
+            areaCountEl.textContent = areas.length;
+            if (areas.length === 0) {
+                areaListEl.innerHTML = `<div style="text-align:center; padding: 20px; color: #94A3B8; font-size: 13px;">생성된 클릭 영역이 없습니다.<br>이미지 위에서 마우스 드래그로 설정하세요.</div>`;
+                return;
+            }
+
+            areaListEl.innerHTML = areas.map((area, idx) => `
+                <div class="area-item">
+                    <div class="area-header">
+                        <span>🎯 영역 #${idx + 1}</span>
+                        <div style="display:flex; gap:8px; align-items:center;">
+                            <span class="area-coords">${area.coords}</span>
+                            <button class="btn-delete" onclick="deleteArea(${idx})">삭제</button>
+                        </div>
+                    </div>
+                    <div>
+                        <label style="font-size:11px; color:#64748B;">이동 링크 (href)</label>
+                        <input type="text" value="${area.href}" onchange="updateArea(${idx}, 'href', this.value)" style="width:100%;">
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <div style="flex:1;">
+                            <label style="font-size:11px; color:#64748B;">이름 (alt)</label>
+                            <input type="text" value="${area.alt}" onchange="updateArea(${idx}, 'alt', this.value)" style="width:100%;">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="font-size:11px; color:#64748B;">타이틀 (title)</label>
+                            <input type="text" value="${area.title}" onchange="updateArea(${idx}, 'title', this.value)" style="width:100%;">
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            drawAll();
+        }
+
+        window.deleteArea = (idx) => {
+            areas.splice(idx, 1);
+            renderAreaList();
+        };
+
+        window.updateArea = (idx, field, value) => {
+            if (areas[idx]) {
+                areas[idx][field] = value;
+            }
+        };
+
+        // 기본 좌표(현재 HTML 내 설정된 좌표) 초기 등록
+        areas = [{
+            coords: '699,763,987,833',
+            href: 'https://www.neonatology.or.kr/conference/seminar2/info.html',
+            alt: '사전등록 바로가기',
+            title: '사전등록 바로가기'
+        }];
+        renderAreaList();
+
+        document.getElementById('btn-save-deploy').addEventListener('click', async () => {
+            const htmlFile = document.getElementById('html-select').value;
+            if (!htmlFile) {
+                alert('대상 HTML 파일을 선택해주세요.');
+                return;
+            }
+            if (areas.length === 0) {
+                alert('최소 1개 이상의 좌표 영역이 필요합니다.');
+                return;
+            }
+
+            const btn = document.getElementById('btn-save-deploy');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Git Push 및 Cloudflare Pages 배포 중...';
+            alertEl.style.display = 'none';
+
+            try {
+                const res = await fetch('/api/save_map', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        html_file: htmlFile,
+                        areas: areas,
+                        push: true
+                    })
+                });
+
+                const result = await res.json();
+                if (result.success) {
+                    alertEl.className = 'alert alert-success';
+                    alertEl.innerHTML = `
+                        <b>🎉 배포 성공!</b><br>
+                        ${result.message}<br>
+                        👉 <a href="${result.url}" target="_blank" style="color:#065F46; font-weight:bold;">${result.url}</a>
+                    `;
+                    alertEl.style.display = 'block';
+                } else {
+                    alertEl.className = 'alert alert-error';
+                    alertEl.innerHTML = `<b>❌ 배포 실패:</b> ${result.error}`;
+                    alertEl.style.display = 'block';
+                }
+            } catch (err) {
+                alertEl.className = 'alert alert-error';
+                alertEl.innerHTML = `<b>❌ 서버 연결 오류:</b> ${err.message}`;
+                alertEl.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '🚀 좌표 적용 및 Cloudflare Pages 즉시 배포';
+            }
+        });
+
+        loadFiles();
+    </script>
+</body>
+</html>

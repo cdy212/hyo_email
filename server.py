@@ -57,9 +57,91 @@ def push_to_git():
         print(f"Server error: {str(e)}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/picker')
+def picker():
+    html_path = os.path.join(BASE_DIR, 'Map_Coordinate_Picker.html')
+    if os.path.exists(html_path):
+        return send_file(html_path)
+    return "Map_Coordinate_Picker.html 파일이 존재하지 않습니다.", 404
+
+@app.route('/api/files', methods=['GET'])
+def list_files():
+    images = []
+    htmls = []
+    for f in os.listdir(BASE_DIR):
+        if f.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
+            images.append(f)
+        elif f.lower().endswith('.html') and f not in ['Email_Template_Builder.html', 'Map_Coordinate_Picker.html', 'test.html']:
+            htmls.append(f)
+    return jsonify({"images": sorted(images), "html_files": sorted(htmls)})
+
+@app.route('/api/save_map', methods=['POST'])
+def save_map():
+    try:
+        data = request.json
+        html_file = data.get('html_file')
+        areas = data.get('areas', [])
+        do_push = data.get('push', True)
+
+        if not html_file or not os.path.exists(os.path.join(BASE_DIR, html_file)):
+            return jsonify({"success": False, "error": "HTML 파일이 지정되지 않았거나 존재하지 않습니다."}), 400
+
+        html_path = os.path.join(BASE_DIR, html_file)
+        with open(html_path, "r", encoding="utf-8") as f:
+            content = f.read()
+
+        # Build area tags
+        area_html_lines = []
+        for area in areas:
+            coords = area.get('coords', '')
+            href = area.get('href', 'https://www.neonatology.or.kr/conference/seminar2/info.html')
+            alt = area.get('alt', '사전등록 바로가기')
+            title = area.get('title', '사전등록 바로가기')
+            area_html_lines.append(f'            <area target="_blank" alt="{alt}" title="{title}"\n                href="{href}"\n                coords="{coords}" shape="rect">')
+        
+        new_areas_block = "\n".join(area_html_lines)
+
+        # Replace <map ...> ... </map> contents
+        import re
+        pattern = re.compile(r'(<map\s+name=["\']image-map["\']>)(.*?)(</map>)', re.DOTALL | re.IGNORECASE)
+        if not pattern.search(content):
+            return jsonify({"success": False, "error": "<map name=\"image-map\"> 태그를 HTML 내에서 찾을 수 없습니다."}), 400
+
+        updated_content = pattern.sub(r'\1\n' + new_areas_block + r'\n        \3', content)
+
+        with open(html_path, "w", encoding="utf-8") as f:
+            f.write(updated_content)
+
+        if do_push:
+            subprocess.run(["git", "add", html_file], check=True, cwd=BASE_DIR)
+            commit_res = subprocess.run(["git", "commit", "-m", f"Auto-deploy map coordinates: {html_file}"], cwd=BASE_DIR, capture_output=True, text=True)
+            print("Commit output:", commit_res.stdout)
+            push_res = subprocess.run(["git", "push"], check=True, cwd=BASE_DIR, capture_output=True, text=True)
+            print("Push output:", push_res.stdout)
+
+        return jsonify({
+            "success": True,
+            "url": f"https://hyo-email.pages.dev/{html_file}",
+            "message": f"{html_file} 좌표 설정 및 Cloudflare Pages 배포가 완료되었습니다!"
+        })
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/<filename>')
+def serve_static(filename):
+    file_path = os.path.join(BASE_DIR, filename)
+    if os.path.exists(file_path):
+        return send_file(file_path)
+    return "File not found", 404
+
 if __name__ == '__main__':
     print("========================================")
     print("🚀 이메일 템플릿 로컬 서버 시작")
-    print("👉 브라우저를 열고 http://127.0.0.1:5000 에 접속하세요!")
+    print("👉 템플릿 빌더: http://127.0.0.1:5000")
+    print("👉 마우스 좌표 픽커: http://127.0.0.1:5000/picker")
     print("========================================")
     app.run(host='127.0.0.1', port=5000, debug=True)
+
