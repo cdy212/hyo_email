@@ -277,6 +277,10 @@
                 <label for="img-select">🖼️ 메인 시안 이미지 (1000px)</label>
                 <select id="img-select"></select>
             </div>
+            <div class="select-group">
+                <label for="target-url-input">🔗 사전 가입버튼 이동 URL (Target Link)</label>
+                <input type="text" id="target-url-input" value="https://www.neonatology.or.kr/conference/seminar2/info.html" style="width: 320px;" onchange="updateGlobalTargetUrl(this.value)">
+            </div>
         </div>
     </div>
 
@@ -374,6 +378,13 @@
             ctx.setLineDash([]);
         });
 
+        function updateGlobalTargetUrl(url) {
+            areas.forEach((area) => {
+                area.href = url;
+            });
+            renderAreaList();
+        }
+
         canvas.addEventListener('mouseup', (e) => {
             if (!isDrawing) return;
             isDrawing = false;
@@ -383,9 +394,10 @@
             const y2 = Math.max(startY, currentY);
 
             if (x2 - x1 > 15 && y2 - y1 > 15) {
+                const globalUrl = document.getElementById('target-url-input') ? document.getElementById('target-url-input').value : 'https://www.neonatology.or.kr/conference/seminar2/info.html';
                 areas.push({
                     coords: `${x1},${y1},${x2},${y2}`,
-                    href: 'https://www.neonatology.or.kr/conference/seminar2/info.html',
+                    href: globalUrl,
                     alt: '사전등록 바로가기',
                     title: '사전등록 바로가기'
                 });
@@ -496,6 +508,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         html_file: htmlFile,
+                        target_url: document.getElementById('target-url-input') ? document.getElementById('target-url-input').value : '',
                         areas: areas,
                         push: true
                     })

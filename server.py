@@ -89,6 +89,7 @@ def save_map():
         html_file = data.get('html_file')
         areas = data.get('areas', [])
         do_push = data.get('push', True)
+        target_url = data.get('target_url')
 
         if not html_file or not os.path.exists(os.path.join(BASE_DIR, html_file)):
             return jsonify({"success": False, "error": "HTML 파일이 지정되지 않았거나 존재하지 않습니다."}), 400
@@ -101,7 +102,7 @@ def save_map():
         area_html_lines = []
         for area in areas:
             coords = area.get('coords', '')
-            href = area.get('href', 'https://www.neonatology.or.kr/conference/seminar2/info.html')
+            href = area.get('href') or target_url or 'https://www.neonatology.or.kr/conference/seminar2/info.html'
             alt = area.get('alt', '사전등록 바로가기')
             title = area.get('title', '사전등록 바로가기')
             area_html_lines.append(f'            <area target="_blank" alt="{alt}" title="{title}"\n                href="{href}"\n                coords="{coords}" shape="rect">')
@@ -115,6 +116,12 @@ def save_map():
             return jsonify({"success": False, "error": "<map name=\"image-map\"> 태그를 HTML 내에서 찾을 수 없습니다."}), 400
 
         updated_content = pattern.sub(r'\1\n' + new_areas_block + r'\n        \3', content)
+
+        # Update fallback <a> links in HTML if target_url is specified or from first area
+        effective_url = target_url or (areas[0].get('href') if areas else None)
+        if effective_url:
+            fallback_pattern = re.compile(r'(<a\s+[^>]*?href=["\'])([^"\']*)(["\'][^>]*?>\s*\[?사전등록\s*바로가기\]?\s*</a>)', re.IGNORECASE)
+            updated_content = fallback_pattern.sub(r'\g<1>' + effective_url + r'\g<3>', updated_content)
 
         with open(html_path, "w", encoding="utf-8") as f:
             f.write(updated_content)

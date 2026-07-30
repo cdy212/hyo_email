@@ -37,3 +37,54 @@ python server.py
 ## 🔒 보안 검토 완료 안내
 - **Git Token 완벽 제거**: 본 프로그램 내(UI 스크립트 및 서버 파이썬 스크립트 등 모든 파일)에는 Github Token(PAT) 문자열이나 이를 로컬스토리지에 저장하는 로직이 **전혀 남아있지 않습니다.** 보안 취약점 점검을 통해 모두 깨끗하게 삭제되었습니다.
 - **시스템 권한 사용**: Github 배포 기능은 사용자의 컴퓨터에 이미 안전하게 설정되어 있는 시스템 내장 Git 자격 증명(Credential Helper)을 그대로 차용합니다. 따라서 외부 인증 정보 유출 위험 없이 100% 안전하게 동작합니다.
+
+---
+
+## ⚡ AI 에이전트 (Antigravity & Codex) 자동화 스킬 가이드 (`/email-presign`)
+
+본 프로젝트에는 **Antigravity** 및 **Codex** 등 AI 코딩 어시스턴트가 프로젝트를 열었을 때 바로 인식하고 실행할 수 있도록 프로젝트 전용 스킬 및 규칙 설정(`.agents/`, `.codex/`, `.antigravity_rules.md`)이 내장되어 있습니다.
+에이전트에게 `/email-presign` 명령을 내리거나 사전등록 이메일 템플릿 작업을 요청하면 아래 **5단계 자동화 파이프라인**을 실행합니다.
+
+### 📋 5-Step 파이프라인 진행 절차
+
+#### Step 0: 사용자 질의 및 변수 확인 (Variables)
+- 메인 시안 이미지, 소셜 공유(`og:image`) 이미지, 기본 HTML 템플릿, 그리고 **버튼 클릭 시 이동할 사전 가입 URL(`target_url`)**은 행사나 세미나마다 달라질 수 있습니다.
+- 에이전트는 시작 전 사용할 이미지/HTML 파일 및 URL을 확인(또는 기본값을 적용)합니다.
+
+#### Step 1: 메인 시안 이미지 1000px 리사이징
+- 이메일 클라이언트 화면에 최적화되도록 원본 메인 이미지를 비율 유지 가로 1000px 고화질로 자동 리사이징(`PIL.Image.Resampling.LANCZOS`)합니다.
+
+#### Step 2: 클라우드 (Cloudflare Pages) Push 및 URL 호스팅
+- 이메일 클라이언트는 상대 경로(`<img src="main.png">`)를 인식하지 못하므로, 이미지를 먼저 Git Push하여 Cloudflare Pages의 외부 호스팅 절대 주소(`https://hyo-email.pages.dev/[파일명]`)를 생성합니다.
+
+#### Step 3: HTML 템플릿 내 절대 경로 및 소셜 메타태그 갱신
+- HTML 파일 내 `<img src="https://hyo-email.pages.dev/...">` 및 카카오/페이스북 소셜 미리보기 `<meta property="og:image" ...>` 태그를 클라우드 절대 주소로 갱신합니다.
+
+#### Step 4 & 5: 웹 마우스 좌표 픽커, 가변 Target URL 설정 및 원클릭 배포 (Web Interactive Picker)
+1. **로컬 API 서버 가동:**
+   ```bash
+   C:\Python37\python.exe server.py
+   ```
+2. **브라우저 픽커 접속:** [http://127.0.0.1:5000/picker](http://127.0.0.1:5000/picker)
+3. **가변 이동 URL (Target Link) 설정:**
+   - 픽커 상단 제어바의 **`🔗 사전 가입버튼 이동 URL (Target Link)`** 입력창에 원하는 신청 페이지 주소를 입력합니다. 이 값은 언제든지 가변적으로 수정할 수 있습니다.
+4. **마우스 드래그 좌표 설정 (시각적 확인용):**
+   - 1000px 이미지 위에서 마우스 드래그로 클릭 영역(`<area>`)을 그리면 **붉은색(`#EF4444`, 반투명 빨강 박스)**으로 즉시 미리보기가 표시됩니다.
+   - 드래그 중에는 실제 HTML 파일에 영향을 주지 않고 화면에서만 확인됩니다.
+5. **원클릭 파일 반영 및 Git Push 배포:**
+   - 우측 하단의 **[🚀 좌표 적용 및 Cloudflare Pages 즉시 배포]** 버튼을 클릭하면 다음과 같이 동작합니다:
+     1. HTML 내 `<map>` 태그의 좌표(`<area>`)가 갱신됩니다.
+     2. `<area>` 태그의 `href` 속성뿐 아니라, **HTML 하단 대체 텍스트 링크(`<a href="...">[사전등록 바로가기]</a>`)도 지정한 가변 URL로 함께 업데이트**됩니다.
+     3. 변경된 HTML 파일이 `git add`, `git commit`, `git push origin main`을 통해 배포됩니다.
+6. **최종 완성본 다운로드:**
+   - 배포 완료 시 메시지 창 하단에 표시되는 **[💾 최종 HTML 파일 내 컴퓨터로 다운로드]** 버튼 또는 로컬 다운로드 API(`http://127.0.0.1:5000/api/download/<파일명>`)를 통해 완성된 HTML을 PC로 즉시 저장할 수 있습니다.
+
+---
+
+### ⚠️ 작업 시 유의점 (Precautions)
+1. **파이썬 실행 환경 (`C:\Python37\python.exe`):**
+   - 시스템 기본 파이썬 환경이 아닌 `flask`, `flask-cors`, `Pillow`가 설치된 `C:\Python37\python.exe`를 사용하여 서버 및 리사이징 스크립트를 구동해야 합니다.
+2. **Windows CMD 인코딩 (`cp949` 충돌 방지):**
+   - Windows 터미널에서 이모지를 인쇄할 경우 `UnicodeEncodeError`로 프로세스가 종료될 수 있습니다. `server.py`는 모든 이모지를 제거하고 ASCII 안전 문자(`[START]`, `[URL]` 등)만 출력하도록 설계되어 있습니다.
+3. **이메일 템플릿 절대 주소 필수:**
+   - 로컬 테스트 시에도 HTML 템플릿의 이미지 경로는 항상 Cloudflare Pages 호스팅 주소(`https://hyo-email.pages.dev/...`)로 설정되어 있어야 이메일 수신 시 정상적으로 노출됩니다.
