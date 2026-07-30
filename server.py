@@ -1,3 +1,10 @@
+import sys
+if hasattr(sys.stdout, 'reconfigure'):
+    try:
+        sys.stdout.reconfigure(encoding='utf-8')
+    except Exception:
+        pass
+
 from flask import Flask, request, jsonify, send_file
 import os
 import subprocess
@@ -139,9 +146,9 @@ def serve_static(filename):
 
 if __name__ == '__main__':
     print("========================================")
-    print("🚀 이메일 템플릿 로컬 서버 시작")
-    print("👉 템플릿 빌더: http://127.0.0.1:5000")
-    print("👉 마우스 좌표 픽커: http://127.0.0.1:5000/picker")
+    print("[START] 이메일 템플릿 로컬 서버 시작")
+    print("[URL] 템플릿 빌더: http://127.0.0.1:5000")
+    print("[URL] 마우스 좌표 픽커: http://127.0.0.1:5000/picker")
     print("========================================")
     app.run(host='127.0.0.1', port=5000, debug=True)
 
