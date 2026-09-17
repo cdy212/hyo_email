@@ -47,37 +47,32 @@ python server.py
 
 ### 📋 5-Step 파이프라인 진행 절차
 
-#### Step 0: 사용자 질의 및 변수 확인 (Variables)
-- 메인 시안 이미지, 소셜 공유(`og:image`) 이미지, 기본 HTML 템플릿, 그리고 **버튼 클릭 시 이동할 사전 가입 URL(`target_url`)**은 행사나 세미나마다 달라질 수 있습니다.
-- 에이전트는 시작 전 사용할 이미지/HTML 파일 및 URL을 확인(또는 기본값을 적용)합니다.
+#### Step 0: 입력 감지 및 최신 HTML 템플릿 탐색 (Dynamic Inputs)
+- 사용자는 **원본 이미지(`{YYMMDD}_{name}.png`)**와 **버튼 이동 타겟 URL(들)**만 전달합니다.
+- 에이전트는 프로젝트 내 `email_*.html` 중 **가장 최신에 작업된 HTML 파일**을 자동으로 찾아 기본 베이스로 상속합니다.
+- 파일명은 `{YYMMDD}_{name}`을 기준으로 메인(`email_..._main.png`), 소셜(`email_..._kakao.png`), HTML(`email_...html`)로 자동 규칙화됩니다.
 
-#### Step 1: 메인 시안 이미지 1000px 리사이징
-- 이메일 클라이언트 화면에 최적화되도록 원본 메인 이미지를 비율 유지 가로 1000px 고화질로 자동 리사이징(`PIL.Image.Resampling.LANCZOS`)합니다.
+#### Step 1: 메인 1000px 리사이징 & 소셜 공유 이미지 자동 생성
+- 원본 메인 이미지를 비율 유지 가로 1000px 고화질(`PIL.Image.Resampling.LANCZOS`)로 자동 리사이징(`email_{YYMMDD}_{name}_main.png`)합니다.
+- 원본 이미지 상단 헤더 배너 비주얼 영역을 자동 감지/크롭하여 SNS 공유 규격(`1200 x 600` 비율)의 `email_{YYMMDD}_{name}_kakao.png`를 자동 생성합니다.
 
-#### Step 2: 클라우드 (Cloudflare Pages) Push 및 URL 호스팅
-- 이메일 클라이언트는 상대 경로(`<img src="main.png">`)를 인식하지 못하므로, 이미지를 먼저 Git Push하여 Cloudflare Pages의 외부 호스팅 절대 주소(`https://hyo-email.pages.dev/[파일명]`)를 생성합니다.
+#### Step 2: 클라우드 (Cloudflare Pages) 절대 경로 호스팅 확인
+- 이메일 클라이언트는 상대 경로를 인식하지 못하므로, 생성된 이미지 및 HTML 파일은 Cloudflare Pages 외부 호스팅 절대 주소(`https://hyo-email.pages.dev/[파일명]`)로 매핑됩니다.
 
-#### Step 3: HTML 템플릿 내 절대 경로 및 소셜 메타태그 갱신
-- HTML 파일 내 `<img src="https://hyo-email.pages.dev/...">` 및 카카오/페이스북 소셜 미리보기 `<meta property="og:image" ...>` 태그를 클라우드 절대 주소로 갱신합니다.
+#### Step 3: 최신 HTML 기반 생성 및 단일/다중 버튼 매핑
+- 최신 HTML 구조를 바탕으로 제목, 메인 이미지, 소셜 미리보기 태그를 절대 주소로 갱신합니다.
+- 시안 내 단일(사전등록) 또는 복수(초록접수 `Abstract Submission` + `사전등록`) 버튼의 좌표를 정밀 매핑하여 `<area>` 태그 및 하단 대체 텍스트 링크에 모두 반영합니다.
 
 #### Step 4 & 5: 웹 마우스 좌표 픽커, 가변 Target URL 설정 및 원클릭 배포 (Web Interactive Picker)
-1. **로컬 API 서버 가동:**
-   ```bash
-   C:\Python37\python.exe server.py
-   ```
-2. **브라우저 픽커 접속:** [http://127.0.0.1:5000/picker](http://127.0.0.1:5000/picker)
-3. **가변 이동 URL (Target Link) 설정:**
-   - 픽커 상단 제어바의 **`🔗 사전 가입버튼 이동 URL (Target Link)`** 입력창에 원하는 신청 페이지 주소를 입력합니다. 이 값은 언제든지 가변적으로 수정할 수 있습니다.
-4. **마우스 드래그 좌표 설정 (시각적 확인용):**
-   - 1000px 이미지 위에서 마우스 드래그로 클릭 영역(`<area>`)을 그리면 **붉은색(`#EF4444`, 반투명 빨강 박스)**으로 즉시 미리보기가 표시됩니다.
-   - 드래그 중에는 실제 HTML 파일에 영향을 주지 않고 화면에서만 확인됩니다.
-5. **원클릭 파일 반영 및 Git Push 배포:**
-   - 우측 하단의 **[🚀 좌표 적용 및 Cloudflare Pages 즉시 배포]** 버튼을 클릭하면 다음과 같이 동작합니다:
-     1. HTML 내 `<map>` 태그의 좌표(`<area>`)가 갱신됩니다.
-     2. `<area>` 태그의 `href` 속성뿐 아니라, **HTML 하단 대체 텍스트 링크(`<a href="...">[사전등록 바로가기]</a>`)도 지정한 가변 URL로 함께 업데이트**됩니다.
-     3. 변경된 HTML 파일이 `git add`, `git commit`, `git push origin main`을 통해 배포됩니다.
-6. **최종 완성본 다운로드:**
-   - 배포 완료 시 메시지 창 하단에 표시되는 **[💾 최종 HTML 파일 내 컴퓨터로 다운로드]** 버튼 또는 로컬 다운로드 API(`http://127.0.0.1:5000/api/download/<파일명>`)를 통해 완성된 HTML을 PC로 즉시 저장할 수 있습니다.
+1. **에이전트 원클릭 배포:**
+   - 모든 파일이 정상 구성되면 `git add ...; git commit ...; git push origin main`으로 Cloudflare Pages에 즉시 배포합니다.
+2. **수동 웹 픽커 검수/조정 (선택 사항):**
+   - 로컬 API 서버 가동: `C:\Python37\python.exe server.py`
+   - 브라우저 픽커 접속: [http://127.0.0.1:5000/picker](http://127.0.0.1:5000/picker)
+   - 마우스 드래그 좌표 설정: 1000px 이미지 위에서 마우스 드래그로 클릭 영역을 그리면 **붉은색(`#EF4444`, 반투명 빨강 박스)**으로 즉시 미리보기가 표시됩니다.
+   - [🚀 좌표 적용 및 Cloudflare Pages 즉시 배포] 버튼을 클릭하면 HTML 내 좌표 및 링크 갱신과 Git Push 배포가 실행됩니다.
+3. **최종 완성본 다운로드:**
+   - 배포 완료 시 표시되는 **[💾 최종 HTML 파일 내 컴퓨터로 다운로드]** 버튼 또는 로컬 다운로드 API(`http://127.0.0.1:5000/api/download/<파일명>`)를 통해 완성된 HTML을 PC로 즉시 저장할 수 있습니다.
 
 ---
 
